@@ -127,7 +127,7 @@ export const Minesweeper: React.FC = () => {
         };
     }, [status, firstClick]);
 
-    const revealCells = (board: CellState[][], r: number, c: number): CellState[][] => {
+    const revealCells = useCallback((board: CellState[][], r: number, c: number): CellState[][] => {
         if (r < 0 || r >= GRID_SIZE.rows || c < 0 || c >= GRID_SIZE.cols || board[r][c].isRevealed || board[r][c].isFlagged) {
             return board;
         }
@@ -142,9 +142,9 @@ export const Minesweeper: React.FC = () => {
             }
         }
         return board;
-    };
+    }, []);
     
-    const checkWinCondition = (currentBoard: CellState[][]) => {
+    const checkWinCondition = useCallback((currentBoard: CellState[][]) => {
         let revealedCount = 0;
         currentBoard.flat().forEach(cell => {
             if (cell.isRevealed && !cell.isMine) revealedCount++;
@@ -152,7 +152,7 @@ export const Minesweeper: React.FC = () => {
         if (revealedCount === (GRID_SIZE.rows * GRID_SIZE.cols) - MINE_COUNT) {
             setStatus('won');
         }
-    };
+    }, []);
 
     const handleClick = (r: number, c: number) => {
         if (status !== 'playing' || board[r][c].isRevealed || board[r][c].isFlagged) return;
