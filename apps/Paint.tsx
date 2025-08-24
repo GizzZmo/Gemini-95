@@ -8,6 +8,8 @@ const SIZES = [2, 5, 10];
 export const Paint: React.FC = () => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const contextRef = useRef<CanvasRenderingContext2D | null>(null);
+    const critiqueIntervalRef = useRef<number | null>(null);
+    const resizeObserverRef = useRef<ResizeObserver | null>(null);
     const [isDrawing, setIsDrawing] = useState(false);
     const [color, setColor] = useState('black');
     const [size, setSize] = useState(2);
@@ -34,8 +36,9 @@ export const Paint: React.FC = () => {
                 }
             }
         }
-    }, [color, size]);
+    }, []);  // Remove dependencies to prevent recreation
 
+    // Setup canvas context and resize observer
     useEffect(() => {
         const canvas = canvasRef.current;
         if (canvas) {
@@ -49,55 +52,85 @@ export const Paint: React.FC = () => {
             }
         }
         
-        const observer = new ResizeObserver(resizeCanvas);
-        if (canvasRef.current?.parentElement) {
-            observer.observe(canvasRef.current.parentElement);
+        // Setup resize observer only once
+        if (!resizeObserverRef.current && canvasRef.current?.parentElement) {
+            resizeObserverRef.current = new ResizeObserver(resizeCanvas);
+            resizeObserverRef.current.observe(canvasRef.current.parentElement);
         }
 
         return () => {
-            observer.disconnect();
+            // Cleanup resize observer on unmount
+            if (resizeObserverRef.current) {
+                resizeObserverRef.current.disconnect();
+                resizeObserverRef.current = null;
+            }
+        };
+    }, []); // Remove color, size from dependencies to prevent unnecessary recreations
+
+    // Update canvas context when color or size changes
+    useEffect(() => {
+        const context = contextRef.current;
+        if (context) {
+            context.strokeStyle = color;
+            context.lineWidth = size;
+        }
+    }, [color, size]);
+
+    // Setup critique interval with proper cleanup
+    useEffect(() => {
+        const startCritiqueInterval = () => {
+            critiqueIntervalRef.current = window.setInterval(async () => {
+                const canvas = canvasRef.current;
+                if (!canvas || !document.body.contains(canvas)) {
+                    // Component unmounted, clear interval
+                    if (critiqueIntervalRef.current) {
+                        clearInterval(critiqueIntervalRef.current);
+                        critiqueIntervalRef.current = null;
+                    }
+                    return;
+                }
+                
+                try {
+                    setCritique("Analyzing your masterpiece...");
+                    const base64Image = canvas.toDataURL('image/png').split(',')[1];
+                    const newCritique = await GeminiService.critiqueDrawing(base64Image);
+                    setCritique(newCritique);
+                } catch (error) {
+                    setCritique("My circuits are buzzing. Try drawing something.");
+                }
+            }, 15000);
         };
 
-    }, [color, size, resizeCanvas]);
+        startCritiqueInterval();
 
-    useEffect(() => {
-        const critiqueInterval = setInterval(async () => {
-            const canvas = canvasRef.current;
-            if (!canvas || !document.body.contains(canvas)) {
-                 clearInterval(critiqueInterval);
-                 return;
+        return () => {
+            // Ensure cleanup on unmount
+            if (critiqueIntervalRef.current) {
+                clearInterval(critiqueIntervalRef.current);
+                critiqueIntervalRef.current = null;
             }
-            
-            try {
-                setCritique("Analyzing your masterpiece...");
-                const base64Image = canvas.toDataURL('image/png').split(',')[1];
-                const newCritique = await GeminiService.critiqueDrawing(base64Image);
-                setCritique(newCritique);
-            } catch (error) {
-                setCritique("My circuits are buzzing. Try drawing something.");
-            }
-        }, 15000);
-
-        return () => clearInterval(critiqueInterval);
+        };
     }, []);
 
     const startDrawing = ({ nativeEvent }: React.MouseEvent<HTMLCanvasElement>) => {
+        if (!contextRef.current) return;
         const { offsetX, offsetY } = nativeEvent;
-        contextRef.current?.beginPath();
-        contextRef.current?.moveTo(offsetX, offsetY);
+        contextRef.current.beginPath();
+        contextRef.current.moveTo(offsetX, offsetY);
         setIsDrawing(true);
     };
 
     const finishDrawing = () => {
-        contextRef.current?.closePath();
+        if (!contextRef.current) return;
+        contextRef.current.closePath();
         setIsDrawing(false);
     };
 
     const draw = ({ nativeEvent }: React.MouseEvent<HTMLCanvasElement>) => {
-        if (!isDrawing) return;
+        if (!isDrawing || !contextRef.current) return;
         const { offsetX, offsetY } = nativeEvent;
-        contextRef.current?.lineTo(offsetX, offsetY);
-        contextRef.current?.stroke();
+        contextRef.current.lineTo(offsetX, offsetY);
+        contextRef.current.stroke();
     };
     
     const clearCanvas = () => {

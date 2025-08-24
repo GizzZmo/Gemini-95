@@ -1,15 +1,21 @@
 
 import { GoogleGenAI } from "@google/genai";
 
-const API_KEY = process.env.API_KEY;
+// Security Note: In a production app, API keys should be handled on the server-side
+// For this demo app, the API key should be set as a Vite environment variable: VITE_API_KEY
+const API_KEY = import.meta.env.VITE_API_KEY;
 
 if (!API_KEY) {
-    console.error("API_KEY environment variable not set.");
+    console.error("VITE_API_KEY environment variable not set.");
 }
 
-const ai = new GoogleGenAI({ apiKey: API_KEY! });
+const ai = API_KEY ? new GoogleGenAI({ apiKey: API_KEY }) : null;
 
 async function generateText(prompt: string): Promise<string> {
+    if (!ai) {
+        throw new Error("Gemini AI service not initialized. Please check API key configuration.");
+    }
+    
     try {
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
@@ -23,6 +29,10 @@ async function generateText(prompt: string): Promise<string> {
 }
 
 async function generateTextWithVision(prompt: string, base64Image: string, mimeType: string = "image/png"): Promise<string> {
+    if (!ai) {
+        throw new Error("Gemini AI service not initialized. Please check API key configuration.");
+    }
+    
     try {
         const imagePart = {
             inlineData: {
@@ -44,6 +54,10 @@ async function generateTextWithVision(prompt: string, base64Image: string, mimeT
 }
 
 async function generateImage(prompt: string): Promise<string> {
+    if (!ai) {
+        throw new Error("Gemini AI service not initialized. Please check API key configuration.");
+    }
+    
     try {
         const response = await ai.models.generateImages({
             model: 'imagen-3.0-generate-002',
