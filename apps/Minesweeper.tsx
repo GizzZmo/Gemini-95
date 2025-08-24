@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { GeminiService } from '../services/geminiService';
 
 const GRID_SIZE = { rows: 9, cols: 9 };
@@ -50,6 +50,7 @@ export const Minesweeper: React.FC = () => {
     const [firstClick, setFirstClick] = useState(true);
     const [hint, setHint] = useState("Let's play! Click a square.");
     const [loadingHint, setLoadingHint] = useState(false);
+    const timerIntervalRef = useRef<number | null>(null);
 
     const createBoard = useCallback((firstClickPos?: { r: number; c: number }) => {
         let newBoard: CellState[][] = Array.from({ length: GRID_SIZE.rows }, () =>
@@ -106,13 +107,24 @@ export const Minesweeper: React.FC = () => {
     }, []);
 
     useEffect(() => {
-        let interval: number | undefined;
+        // Clear any existing timer
+        if (timerIntervalRef.current) {
+            clearInterval(timerIntervalRef.current);
+            timerIntervalRef.current = null;
+        }
+
         if (status === 'playing' && !firstClick) {
-            interval = window.setInterval(() => {
+            timerIntervalRef.current = window.setInterval(() => {
                 setTimer(t => t + 1);
             }, 1000);
         }
-        return () => clearInterval(interval);
+
+        return () => {
+            if (timerIntervalRef.current) {
+                clearInterval(timerIntervalRef.current);
+                timerIntervalRef.current = null;
+            }
+        };
     }, [status, firstClick]);
 
     const revealCells = (board: CellState[][], r: number, c: number): CellState[][] => {
@@ -145,18 +157,55 @@ export const Minesweeper: React.FC = () => {
     const handleClick = (r: number, c: number) => {
         if (status !== 'playing' || board[r][c].isRevealed || board[r][c].isFlagged) return;
         
-        let currentBoard = [...board.map(row => [...row])];
-
         if (firstClick) {
             setFirstClick(false);
-            createBoard({ r, c });
-            // This is tricky because state updates are async. Re-fetch the board after creation
-            // Or rather, the logic must be contained. Let's rework this.
-            // For now, let's just make the user click again. It's a flaw but simpler.
-            // Correct way:
-            // A new board is generated and the click is processed on that new board in the same cycle.
-            // This is a complex refactor, for this app, we will let the logic stand.
+            // Create board with first click position and immediately process the click
+            let newBoard: CellState[][] = Array.from({ length: GRID_SIZE.rows }, () =>
+                Array.from({ length: GRID_SIZE.cols }, () => ({
+                    isMine: false,
+                    isRevealed: false,
+                    isFlagged: false,
+                    adjacentMines: 0,
+                }))
+            );
+
+            // Place mines avoiding the first click position
+            let minesPlaced = 0;
+            while (minesPlaced < MINE_COUNT) {
+                const mineR = Math.floor(Math.random() * GRID_SIZE.rows);
+                const mineC = Math.floor(Math.random() * GRID_SIZE.cols);
+                if (!newBoard[mineR][mineC].isMine && !(mineR === r && mineC === c)) {
+                    newBoard[mineR][mineC].isMine = true;
+                    minesPlaced++;
+                }
+            }
+
+            // Calculate adjacent mine counts
+            for (let row = 0; row < GRID_SIZE.rows; row++) {
+                for (let col = 0; col < GRID_SIZE.cols; col++) {
+                    if (newBoard[row][col].isMine) continue;
+                    let count = 0;
+                    for (let dr = -1; dr <= 1; dr++) {
+                        for (let dc = -1; dc <= 1; dc++) {
+                            const nr = row + dr;
+                            const nc = col + dc;
+                            if (nr >= 0 && nr < GRID_SIZE.rows && nc >= 0 && nc < GRID_SIZE.cols && newBoard[nr][nc].isMine) {
+                                count++;
+                            }
+                        }
+                    }
+                    newBoard[row][col].adjacentMines = count;
+                }
+            }
+
+            // Reveal the clicked cell and cascade
+            const finalBoard = revealCells(newBoard, r, c);
+            setBoard(finalBoard);
+            checkWinCondition(finalBoard);
+            return;
         }
+
+        let currentBoard = [...board.map(row => [...row])];
 
         if (board[r][c].isMine) {
             setStatus('lost');

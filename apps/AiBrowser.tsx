@@ -9,20 +9,29 @@ export const AiBrowser: React.FC = () => {
     const audioRef = useRef<HTMLAudioElement | null>(null);
 
     const handleNavigate = async () => {
-        if (!url) return;
+        if (!url.trim()) return;
+        
         setIsLoading(true);
         setCurrentContent('');
 
+        // Play dial-up sound effect
         if (audioRef.current) {
             audioRef.current.play().catch(e => console.error("Audio play failed", e));
         }
 
         try {
-            const htmlContent = await GeminiService.generateWebsiteHtml(url);
+            const htmlContent = await GeminiService.generateWebsiteHtml(url.trim());
             setCurrentContent(htmlContent);
         } catch (error) {
-            console.error(error);
-            setCurrentContent(`<p style="color:red">Failed to generate website: ${(error as Error).message}</p>`);
+            console.error("Failed to generate website:", error);
+            const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+            setCurrentContent(`
+                <div style="padding: 20px; font-family: Arial, sans-serif; text-align: center;">
+                    <h2 style="color: red;">Connection Failed</h2>
+                    <p>Failed to generate website: ${errorMessage}</p>
+                    <p>Please try again later or check your connection.</p>
+                </div>
+            `);
         } finally {
             setIsLoading(false);
             if (audioRef.current) {

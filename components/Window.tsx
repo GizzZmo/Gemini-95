@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useRef, ReactNode } from 'react';
 import type { AppId } from '../types';
+import { useAppContext } from '../hooks/useAppContext';
 
 interface WindowProps {
     id: AppId;
@@ -109,6 +110,3 @@ export const Window: React.FC<WindowProps> = ({ id, title, iconUrl, children, in
         </div>
     );
 };
-
-// Dummy useAppContext to satisfy Window.tsx until all files are loaded. Real one is in hooks/
-const useAppContext = () => ({ openApps: new Map() });
