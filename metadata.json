@@ -1,0 +1,5 @@
+{
+  "name": "Gemini 95",
+  "description": "A retro Windows 95-style desktop environment powered by Gemini. Features classic applications like a web browser, notepad, paint, and minesweeper, all enhanced with AI capabilities.",
+  "requestFramePermissions": []
+}
